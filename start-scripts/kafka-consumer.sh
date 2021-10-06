@@ -1,3 +1,5 @@
 #!/bin/sh
 
-/home/ashen/gsb-apps/spark-3.1.1-bin-hadoop2.7/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 /home/ashen/Desktop/BIGDATA-INT/cdc-kafka-spark-sql-streaming/cdc/readKafka.py
+~/gsb-apps/kafka_2.13-2.8.0/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic postgres.public.customers
+
+~/gsb-apps/kafka_2.13-2.8.0/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic postgres.public.orders

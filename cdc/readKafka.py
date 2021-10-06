@@ -1,5 +1,4 @@
 # Imports and running findspark
-
 import findspark
 from pyspark.sql.functions import from_json
 
@@ -17,40 +16,65 @@ schema = StructType([
     StructField("after", StringType())
 ])
 
-rawDF = sc \
+customerDF = sc \
     .readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "localhost:9092") \
-    .option("subscribe", "postgres.public.customers, postgres.public.orders") \
+    .option("subscribe", "postgres.public.customers") \
+    .load()
+
+orderDF = sc \
+    .readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "localhost:9092") \
+    .option("subscribe", "postgres.public.orders") \
     .load()
 
 # .option("startingOffsets", "earliest") \
 
-print("#################################################################")
-print("Printing Schema of rawDF: ")
-rawDF.printSchema()
+
+# rawDF = customerDF.join(orderDF)
+# print("#################################################################")
+# print("Printing Schema of rawDF: ")
+# rawDF.printSchema()
+# print(rawDF)
 
 # df = df.selectExpr("CAST(value AS STRING)", "CAST(timestamp AS TIMESTAMP)").select("value")
 
-df1 = rawDF.selectExpr("CAST(value AS STRING)", "timestamp").select(from_json('value', schema).alias("data"), "timestamp")
+df1 = customerDF.selectExpr("CAST(value AS STRING) as cname").select(from_json('cname', schema).alias("cdata"))
+df2 = orderDF.selectExpr("CAST(value AS STRING) as oname").select(from_json('oname', schema).alias("odata"))
 
-df2 = df1.select("data.after", "timestamp")
+cdf = df1.select("cdata.after").alias("customer")
+odf = df2.select("odata.after").alias("order")
 
-print("Printing Schema of records_df2: ")
-df2.printSchema()
+# customerSchema = StructType([
+#     StructField("id", IntegerType()),
+#     StructField("name", StringType()),
+#     StructField("email", StringType()),
+#     StructField("location", StringType())
+# ])
+#
+# orderSchema = StructType([
+#     StructField("id", IntegerType()),
+#     StructField("customer_id", IntegerType()),
+#     StructField("item", StringType()),
+#     StructField("price", StringType())
+# ])
 
 commonSchema = StructType([
     StructField("id", IntegerType()),
     StructField("name", StringType()),
     StructField("email", StringType()),
     StructField("location", StringType()),
+    StructField("customer_id", IntegerType()),
     StructField("item", StringType()),
     StructField("price", StringType())
 ])
 
-df3 = df2.select(from_json('after', commonSchema).alias("records"))
+cusDF = cdf.select(from_json('customer.after', commonSchema).alias("crecords")).select("crecords.id", "crecords.name", "crecords.email", "crecords.location")
+# ordDF = odf.select(from_json('order.after', commonSchema).alias("orecords")).select("orecords.item", "orecords.price")
 
-df4 = df3.select("records.name", "records.email", "records.location", "records.item", "records.price")
+# finalDF = cusDF.join(ordDF)
 
 # df4.createOrReplaceTempView(customerName)
 # df = df.withColumn('value_str', df['value'].cast('string')).drop('value')
@@ -58,10 +82,11 @@ df4 = df3.select("records.name", "records.email", "records.location", "records.i
 # df = df.select(from_json('value_str', schema)).alias('data')
 
 
-records_write_stream = df4.writeStream \
+records_write_stream = cusDF.writeStream \
     .format('console') \
     .start()
-
+#.trigger(processingTime='2 seconds') \
+# .outputMode("append") \
 records_write_stream.awaitTermination()
 
 # customerName = df4.collect()[0][0]
